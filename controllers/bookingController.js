@@ -6,7 +6,7 @@ const Flight = require('../models/flightModel');
 // @access  Private
 const createBooking = async (req, res) => {
     try {
-        const { flightId, seats } = req.body;
+        const { flightId, passengers, date } = req.body;
 
         // 1. Find flight
         const flight = await Flight.findById(flightId);
@@ -15,24 +15,28 @@ const createBooking = async (req, res) => {
             return res.status(404).json({ message: 'Flight not found' });
         }
 
+        // 🔥 NEW: seats = number of passengers
+        const seatsRequested = passengers.length;
+
         // 2. Check seat availability
-        if (flight.seatsAvailable < seats) {
+        if (flight.seatsAvailable < seatsRequested) {
             return res.status(400).json({ message: 'Not enough seats available' });
         }
 
-        // 3. Calculate price
-        const totalPrice = flight.price * seats;
+        // 3. Calculate total price
+        const totalPrice = flight.price * seatsRequested;
 
-        // 4. Create booking
+        // 4. Create booking (UPDATED STRUCTURE)
         const booking = await Booking.create({
             user: req.user._id,
             flight: flightId,
-            seatsBooked: seats,
+            date,
+            passengers,
             totalPrice
         });
 
         // 5. Reduce seats
-        flight.seatsAvailable -= seats;
+        flight.seatsAvailable -= seatsRequested;
         await flight.save();
 
         res.status(201).json(booking);

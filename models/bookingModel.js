@@ -1,27 +1,31 @@
 const mongoose = require('mongoose');
 
 const bookingSchema = new mongoose.Schema({
-    user: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
-    },
-    flight: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Flight',
-        required: true
-    },
-    seatsBooked: {
-        type: Number,
-        required: true,
-        default: 1
-    },
-    totalPrice: {
-        type: Number,
-        required: true
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+
+  flight: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Flight'
+  },
+
+  date: {
+    type: Date,
+    required: true
+  },
+
+  passengers: [
+    {
+      name: String,
+      age: Number,
+      gender: String
     }
-}, {
-    timestamps: true
-});
+  ],
+
+  totalPrice: Number
+
+}, { timestamps: true });
 
 module.exports = mongoose.model('Booking', bookingSchema);
