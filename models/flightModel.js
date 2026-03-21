@@ -23,7 +23,7 @@ const flightSchema = new mongoose.Schema({
         required: true
     },
     arrivalTime: {
-        type: Date,
+        type: String,
         required: true
     },
     price: {
