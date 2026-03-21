@@ -51,7 +51,7 @@ const createBooking = async (req, res) => {
 // @access  Private
 const getMyBookings = async (req, res) => {
     try {
-        const bookings = await Booking.find({ user: req.user._id })
+        const bookings = await Booking.find({ user: req.user._id, date: { $gte: new Date() } })
             .populate('flight')   // brings flight details
             .populate('user', 'name email'); // optional
 
