@@ -5,16 +5,36 @@ const Flight = require('../models/flightModel');
 // @access  Private/Admin
 const createFlight = async (req, res) => {
     try {
-        const flight = await Flight.create(req.body);
+        const {
+            flightNumber,
+            airline,
+            from,
+            to,
+            departureTime,
+            arrivalTime,
+            price,
+            seatsAvailable,
+            date
+        } = req.body;
+
+        const flight = await Flight.create({
+            flightNumber,
+            airline,
+            from,
+            to,
+            departureTime,
+            arrivalTime,
+            price,
+            seatsAvailable,
+            date // ✅ IMPORTANT FIX
+        });
+
         res.status(201).json(flight);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
 
-// @desc    Get all flights (with optional filters)
-// @route   GET /api/flights
-// @access  Public
 // @desc    Advanced flight search
 // @route   GET /api/flights
 // @access  Public
@@ -32,22 +52,23 @@ const getFlights = async (req, res) => {
 
         let query = {};
 
-        // Case-insensitive search
+        // 🔍 From filter
         if (from) {
             query.from = { $regex: from, $options: 'i' };
         }
 
+        // 🔍 To filter
         if (to) {
             query.to = { $regex: to, $options: 'i' };
         }
 
-        // Date filtering
+        // 🔥 FIXED DATE FILTER (IMPORTANT)
         if (date) {
             const start = new Date(date);
             const end = new Date(date);
             end.setDate(end.getDate() + 1);
 
-            query.departureTime = {
+            query.date = {
                 $gte: start,
                 $lt: end
             };
@@ -81,8 +102,6 @@ const getFlights = async (req, res) => {
 };
 
 // @desc    Cancel flight (Admin)
-// @route   PUT /api/flights/:id/cancel
-// @access  Private/Admin
 const cancelFlight = async (req, res) => {
     try {
         const flight = await Flight.findById(req.params.id);
