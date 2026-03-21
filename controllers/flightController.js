@@ -14,7 +14,8 @@ const createFlight = async (req, res) => {
             arrivalTime,
             price,
             seatsAvailable,
-            date
+            scheduleType,
+            daysOfWeek
         } = req.body;
 
         const flight = await Flight.create({
@@ -26,16 +27,19 @@ const createFlight = async (req, res) => {
             arrivalTime,
             price,
             seatsAvailable,
-            date // ✅ IMPORTANT FIX
+            scheduleType,
+            daysOfWeek
         });
 
         res.status(201).json(flight);
+
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
 
-// @desc    Advanced flight search
+
+// @desc    Get flights with schedule logic
 // @route   GET /api/flights
 // @access  Public
 const getFlights = async (req, res) => {
@@ -62,44 +66,51 @@ const getFlights = async (req, res) => {
             query.to = { $regex: to, $options: 'i' };
         }
 
-        // 🔥 FIXED DATE FILTER (IMPORTANT)
-        if (date) {
-            const start = new Date(date);
-            const end = new Date(date);
-            end.setDate(end.getDate() + 1);
+        let flights = await Flight.find(query);
 
-            query.date = {
-                $gte: start,
-                $lt: end
-            };
+        // 🔥 APPLY SCHEDULE LOGIC
+        if (date) {
+            const selectedDay = new Date(date).getDay();
+
+            flights = flights.filter(flight => {
+                // Daily flights → always available
+                if (flight.scheduleType === 'daily') return true;
+
+                // Weekly flights → match day
+                if (flight.scheduleType === 'weekly') {
+                    return flight.daysOfWeek.includes(selectedDay);
+                }
+
+                return false;
+            });
         }
 
-        // Sorting
+        // 🔽 SORTING
         const sortOrder = order === 'asc' ? 1 : -1;
-        const sortOptions = {};
-        sortOptions[sortBy] = sortOrder;
 
-        // Pagination
-        const skip = (page - 1) * limit;
+        flights.sort((a, b) => {
+            if (sortBy === 'price') {
+                return sortOrder * (a.price - b.price);
+            }
+            return 0;
+        });
 
-        const flights = await Flight.find(query)
-            .sort(sortOptions)
-            .skip(skip)
-            .limit(parseInt(limit));
-
-        const total = await Flight.countDocuments(query);
+        // 🔽 PAGINATION
+        const startIndex = (page - 1) * limit;
+        const paginatedFlights = flights.slice(startIndex, startIndex + parseInt(limit));
 
         res.json({
-            total,
+            total: flights.length,
             page: Number(page),
-            pages: Math.ceil(total / limit),
-            flights
+            pages: Math.ceil(flights.length / limit),
+            flights: paginatedFlights
         });
 
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
+
 
 // @desc    Cancel flight (Admin)
 const cancelFlight = async (req, res) => {

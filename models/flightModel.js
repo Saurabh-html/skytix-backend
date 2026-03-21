@@ -34,6 +34,16 @@ const flightSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
+    scheduleType: {
+  type: String,
+  enum: ['daily', 'weekly'],
+  required: true
+},
+
+daysOfWeek: {
+  type: [Number], // 0 = Sunday, 1 = Monday...
+  default: []
+},
     status: {
     type: String,
     enum: ['scheduled', 'cancelled'],
