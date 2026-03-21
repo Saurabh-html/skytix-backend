@@ -77,4 +77,40 @@ const getUserProfile = async (req, res) => {
     });
 };
 
-module.exports = { registerUser, loginUser, getUserProfile };
+// @desc    Reset Password
+// @route   PUT /api/users/reset-password
+// @access  Public
+const resetPassword = async (req, res) => {
+    try {
+        const { email, newPassword } = req.body;
+
+        // 1. Check if email exists
+        const user = await User.findOne({ email });
+
+        if (!user) {
+            return res.status(404).json({
+                message: 'Email not registered'
+            });
+        }
+
+        // 2. Hash new password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+        // 3. Update password
+        user.password = hashedPassword;
+        await user.save();
+
+        // 4. Response
+        res.json({
+            message: 'Password updated successfully'
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            message: error.message
+        });
+    }
+};
+
+module.exports = { registerUser, loginUser, getUserProfile, resetPassword };

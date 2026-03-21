@@ -5,5 +5,5 @@ const generateToken = (id) => {
         expiresIn: '30d'
     });
 };
-console.log("JWT_SECRET:", process.env.JWT_SECRET);
+
 module.exports = generateToken;
