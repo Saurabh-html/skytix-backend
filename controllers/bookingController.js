@@ -62,56 +62,53 @@ const getMyBookings = async (req, res) => {
     }
 };
 
-// @desc    Cancel booking (partial or full)
-// @route   DELETE /api/bookings/:id
-// @access  Private
+// @desc Cancel selected passengers
+// @route DELETE /api/bookings/:id
+// @access Private
+
 const cancelBooking = async (req, res) => {
-    try {
-        const { seats } = req.body; // seats to cancel
+  try {
+    const { passengerIndexes } = req.body; // array of indexes
 
-        const booking = await Booking.findById(req.params.id);
+    const booking = await Booking.findById(req.params.id);
 
-        if (!booking) {
-            return res.status(404).json({ message: 'Booking not found' });
-        }
-
-        // Ownership check
-        if (booking.user.toString() !== req.user._id.toString()) {
-            return res.status(401).json({ message: 'Not authorized' });
-        }
-
-        // Validate seats
-        if (seats > booking.seatsBooked) {
-            return res.status(400).json({ message: 'Cannot cancel more seats than booked' });
-        }
-
-        // Restore seats in flight
-        const flight = await Flight.findById(booking.flight);
-        if (flight) {
-            flight.seatsAvailable += seats;
-            await flight.save();
-        }
-
-        // Case 1: Partial cancellation
-        if (seats < booking.seatsBooked) {
-            booking.seatsBooked -= seats;
-            booking.totalPrice = booking.seatsBooked * flight.price;
-            await booking.save();
-
-            return res.json({
-                message: 'Partial cancellation successful',
-                booking
-            });
-        }
-
-        // Case 2: Full cancellation
-        await booking.deleteOne();
-
-        res.json({ message: 'Booking fully cancelled' });
-
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    if (!booking) {
+      return res.status(404).json({ message: 'Booking not found' });
     }
+
+    const flight = await Flight.findById(booking.flight);
+
+    // Remove selected passengers
+    const remainingPassengers = booking.passengers.filter(
+      (_, index) => !passengerIndexes.includes(index)
+    );
+
+    const cancelledCount = booking.passengers.length - remainingPassengers.length;
+
+    // Update booking
+    booking.passengers = remainingPassengers;
+    booking.seatsBooked = remainingPassengers.length;
+    booking.totalPrice = booking.seatsBooked * flight.price;
+
+    // Return seats back to flight
+    flight.seatsAvailable += cancelledCount;
+
+    // If no passengers left → delete booking
+    if (booking.passengers.length === 0) {
+      await booking.deleteOne();
+    } else {
+      await booking.save();
+    }
+
+    await flight.save();
+
+    res.json({
+      message: 'Selected tickets cancelled successfully'
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 module.exports = { createBooking, getMyBookings, cancelBooking };
