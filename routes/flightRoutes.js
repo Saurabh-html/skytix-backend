@@ -1,15 +1,27 @@
 const express = require('express');
 const router = express.Router();
-const { createFlight, getFlights, cancelFlight } = require('../controllers/flightController');
+
+const {
+  createFlight,
+  getFlights,
+  cancelFlight,
+  bulkCreateFlights,
+  cancelFlightByDate,
+  deleteFlight
+} = require('../controllers/flightController');
+
 const { protect, admin } = require('../middleware/authMiddleware');
 
-// Public route (anyone can search flights)
 router.get('/', getFlights);
 
-// Only admin can create flights
 router.post('/', protect, admin, createFlight);
 
-//Cancel Flight (Admin)
+router.post('/bulk', protect, admin, bulkCreateFlights);
+
+router.put('/:id/cancel-date', protect, admin, cancelFlightByDate);
+
 router.put('/:id/cancel', protect, admin, cancelFlight);
+
+router.delete('/:id', protect, admin, deleteFlight);
 
 module.exports = router;
