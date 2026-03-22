@@ -30,10 +30,12 @@ const flightSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
-    seatsAvailable: {
-        type: Number,
-        required: true
-    },
+    seatsByDate: {
+  type: Map,
+  of: Number,
+  default: {},
+  required: true
+},
     scheduleType: {
   type: String,
   enum: ['daily', 'weekly'],

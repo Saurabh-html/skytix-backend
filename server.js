@@ -8,6 +8,7 @@ const connectDB = require('./config/db');
 const userRoutes = require('./routes/userRoutes');
 const flightRoutes = require('./routes/flightRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
+const airportRoutes = require('./routes/airportRoutes');
 
 
 // Connect Database
@@ -24,6 +25,8 @@ app.use('/api/users', userRoutes);
 app.use('/api/flights', flightRoutes);
 
 app.use('/api/bookings', bookingRoutes);
+
+app.use('/api/airports', airportRoutes);
 
 // Test Route
 app.get('/', (req, res) => {
