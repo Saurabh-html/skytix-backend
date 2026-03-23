@@ -4,37 +4,47 @@ const flightSchema = new mongoose.Schema({
   flightNumber: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
+    trim: true
   },
+
   airline: {
     type: String,
     default: 'Skytix'
   },
+
   from: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
+
   to: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
+
   departureTime: {
     type: String,
     required: true
   },
+
   arrivalTime: {
     type: String,
     required: true
   },
+
   price: {
     type: Number,
-    required: true
+    required: true,
+    min: 0
   },
 
-  // ✅ IMPORTANT FIX
   seatsAvailable: {
     type: Number,
-    required: true
+    required: true,
+    min: 1
   },
 
   seatsByDate: {
@@ -51,7 +61,15 @@ const flightSchema = new mongoose.Schema({
 
   daysOfWeek: {
     type: [Number],
-    default: []
+    validate: {
+      validator: function (arr) {
+        if (this.scheduleType === 'weekly') {
+          return arr.length > 0;
+        }
+        return true;
+      },
+      message: 'daysOfWeek required for weekly flights'
+    }
   },
 
   cancelledDates: {

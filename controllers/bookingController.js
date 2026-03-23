@@ -1,10 +1,32 @@
 const Booking = require('../models/bookingModel');
 const Flight = require('../models/flightModel');
 
-// @desc Create booking
+const getDateKey = (date) => {
+  return new Date(date).toLocaleDateString('en-CA');
+};
+
+// CREATE BOOKING
 const createBooking = async (req, res) => {
   try {
     const { flightId, passengers, date } = req.body;
+
+    if (!flightId || !passengers || !date) {
+      return res.status(400).json({ message: 'Missing fields' });
+    }
+
+    const selectedDate = new Date(date);
+    const today = new Date();
+
+    const maxDate = new Date();
+    maxDate.setMonth(maxDate.getMonth() + 2);
+
+    if (selectedDate < today) {
+      return res.status(400).json({ message: 'Cannot book past flights' });
+    }
+
+    if (selectedDate > maxDate) {
+      return res.status(400).json({ message: 'Booking allowed within 2 months' });
+    }
 
     const flight = await Flight.findById(flightId);
 
@@ -12,18 +34,26 @@ const createBooking = async (req, res) => {
       return res.status(404).json({ message: 'Flight not found' });
     }
 
+    const dateKey = getDateKey(date);
+    const selectedDay = selectedDate.getDay();
+
+    // schedule validation
+    if (flight.scheduleType === 'weekly' &&
+        !flight.daysOfWeek.includes(selectedDay)) {
+      return res.status(400).json({ message: 'Flight not available on this day' });
+    }
+
+    if (flight.cancelledDates.includes(dateKey)) {
+      return res.status(400).json({ message: 'Flight cancelled for this date' });
+    }
+
     const seatsRequested = passengers.length;
 
-    const dateKey = new Date(date).toISOString().split('T')[0];
-
-    //  GET DATE-WISE SEATS
     const availableSeats =
       flight.seatsByDate.get(dateKey) ?? flight.seatsAvailable;
 
     if (availableSeats < seatsRequested) {
-      return res.status(400).json({
-        message: 'Not enough seats available for selected date'
-      });
+      return res.status(400).json({ message: 'Not enough seats available' });
     }
 
     const totalPrice = flight.price * seatsRequested;
@@ -36,41 +66,32 @@ const createBooking = async (req, res) => {
       totalPrice
     });
 
-    //  UPDATE DATE-WISE SEATS
-    flight.seatsByDate.set(
-      dateKey,
-      availableSeats - seatsRequested
-    );
-
+    flight.seatsByDate.set(dateKey, availableSeats - seatsRequested);
     await flight.save();
 
-    res.status(201).json(booking);
+    res.status(201).json({ success: true, booking });
 
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-
-// @desc Get bookings
+// GET BOOKINGS
 const getMyBookings = async (req, res) => {
   try {
     const bookings = await Booking.find({
       user: req.user._id,
       date: { $gte: new Date() }
-    })
-      .populate('flight')
-      .populate('user', 'name email');
+    }).populate('flight');
 
-    res.json(bookings);
+    res.json({ success: true, bookings });
 
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-
-// @desc Cancel selected passengers
+// CANCEL BOOKING
 const cancelBooking = async (req, res) => {
   try {
     const { passengerIndexes } = req.body;
@@ -83,10 +104,10 @@ const cancelBooking = async (req, res) => {
 
     const flight = await Flight.findById(booking.flight);
 
-    const dateKey = new Date(booking.date).toISOString().split('T')[0];
+    const dateKey = getDateKey(booking.date);
 
     const remainingPassengers = booking.passengers.filter(
-      (_, index) => !passengerIndexes.includes(index)
+      (_, i) => !passengerIndexes.includes(i)
     );
 
     const cancelledCount =
@@ -95,11 +116,7 @@ const cancelBooking = async (req, res) => {
     const existingSeats =
       flight.seatsByDate.get(dateKey) ?? flight.seatsAvailable;
 
-    //  RETURN SEATS TO SAME DATE
-    flight.seatsByDate.set(
-      dateKey,
-      existingSeats + cancelledCount
-    );
+    flight.seatsByDate.set(dateKey, existingSeats + cancelledCount);
 
     if (remainingPassengers.length === 0) {
       await booking.deleteOne();
@@ -112,8 +129,69 @@ const cancelBooking = async (req, res) => {
 
     await flight.save();
 
+    res.json({ success: true, message: 'Tickets cancelled' });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ==========================
+// ADMIN: GET ALL BOOKINGS
+// ==========================
+const getAllBookings = async (req, res) => {
+  try {
+    const bookings = await Booking.find()
+      .populate('flight')
+      .populate('user', 'name email');
+
+    res.json({ success: true, bookings });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+// ==========================
+// ADMIN: STATS (AGGREGATION)
+// ==========================
+const getBookingStats = async (req, res) => {
+  try {
+
+    const stats = await Booking.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalBookings: { $sum: 1 },
+          totalRevenue: { $sum: "$totalPrice" },
+          totalPassengers: { $sum: { $size: "$passengers" } }
+        }
+      }
+    ]);
+
+    // DAILY BOOKINGS (for charts)
+    const daily = await Booking.aggregate([
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" }
+          },
+          bookings: { $sum: 1 },
+          revenue: { $sum: "$totalPrice" }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
     res.json({
-      message: 'Selected tickets cancelled successfully'
+      success: true,
+      stats: stats[0] || {
+        totalBookings: 0,
+        totalRevenue: 0,
+        totalPassengers: 0
+      },
+      daily
     });
 
   } catch (error) {
@@ -121,4 +199,4 @@ const cancelBooking = async (req, res) => {
   }
 };
 
-module.exports = { createBooking, getMyBookings, cancelBooking };
+module.exports = { createBooking, getMyBookings, cancelBooking, getAllBookings, getBookingStats };

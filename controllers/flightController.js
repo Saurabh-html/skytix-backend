@@ -1,5 +1,10 @@
 const Flight = require('../models/flightModel');
 
+// 🔧 Utility (NO timezone bug)
+const getDateKey = (date) => {
+  return new Date(date).toLocaleDateString('en-CA'); // YYYY-MM-DD
+};
+
 // CREATE FLIGHT
 const createFlight = async (req, res) => {
   try {
@@ -9,9 +14,10 @@ const createFlight = async (req, res) => {
       cancelledDates: []
     });
 
-    res.status(201).json(flight);
+    res.status(201).json({ success: true, data: flight });
+
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(400).json({ success: false, message: error.message });
   }
 };
 
@@ -20,7 +26,11 @@ const bulkCreateFlights = async (req, res) => {
   try {
     const { baseFlightNumber, count, ...rest } = req.body;
 
-    let flights = [];
+    if (!baseFlightNumber || !count) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    const flights = [];
 
     for (let i = 0; i < count; i++) {
       flights.push({
@@ -33,10 +43,10 @@ const bulkCreateFlights = async (req, res) => {
 
     await Flight.insertMany(flights);
 
-    res.json({ message: `${count} flights created successfully` });
+    res.json({ success: true, message: `${count} flights created` });
 
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -50,53 +60,58 @@ const getFlights = async (req, res) => {
     if (from) query.from = { $regex: from, $options: 'i' };
     if (to) query.to = { $regex: to, $options: 'i' };
 
-    let flights = await Flight.find(query);
+    const flights = await Flight.find(query);
 
-    let dateKey = date
-      ? new Date(date).toISOString().split('T')[0]
-      : null;
+    const dateKey = date ? getDateKey(date) : null;
+    const selectedDay = date ? new Date(date).getDay() : null;
 
-    if (date) {
-      const selectedDay = new Date(date).getDay();
+    const result = flights
+      .filter(f => {
+        if (date) {
+          // schedule check
+          if (f.scheduleType === 'weekly' && !f.daysOfWeek.includes(selectedDay)) {
+            return false;
+          }
 
-      flights = flights.filter(f => {
-        if (f.scheduleType === 'weekly' && !f.daysOfWeek.includes(selectedDay)) {
-          return false;
+          // cancelled date
+          if (f.cancelledDates.includes(dateKey)) {
+            return false;
+          }
         }
-
-        if (f.cancelledDates.includes(dateKey)) {
-          return false;
-        }
-
         return true;
+      })
+      .map(f => {
+        const seats =
+          dateKey && f.seatsByDate.get(dateKey) !== undefined
+            ? f.seatsByDate.get(dateKey)
+            : f.seatsAvailable;
+
+        return {
+          ...f._doc,
+          seatsAvailable: seats
+        };
       });
-    }
 
-    const updatedFlights = flights.map(f => {
-      let seats = f.seatsAvailable;
-
-      if (dateKey) {
-        seats = f.seatsByDate.get(dateKey) ?? f.seatsAvailable;
-      }
-
-      return {
-        ...f._doc,
-        seatsAvailable: seats
-      };
-    });
-
-    res.json({ flights: updatedFlights });
+    res.json({ success: true, flights: result });
 
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// DELETE FLIGHT ✅ NEW
+// DELETE
 const deleteFlight = async (req, res) => {
   try {
-    await Flight.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Flight deleted' });
+    const flight = await Flight.findById(req.params.id);
+
+    if (!flight) {
+      return res.status(404).json({ message: 'Flight not found' });
+    }
+
+    await flight.deleteOne();
+
+    res.json({ success: true, message: 'Flight deleted' });
+
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -114,25 +129,25 @@ const cancelFlight = async (req, res) => {
     flight.status = 'cancelled';
     await flight.save();
 
-    res.json({ message: 'Flight cancelled' });
+    res.json({ success: true, message: 'Flight cancelled' });
 
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// CANCEL BY DATE
+// CANCEL DATE
 const cancelFlightByDate = async (req, res) => {
   try {
     const { date } = req.body;
 
-    const flight = await Flight.findById(req.params.id);
-
-    if (!flight) {
-      return res.status(404).json({ message: 'Flight not found' });
+    if (!date) {
+      return res.status(400).json({ message: 'Date required' });
     }
 
-    const dateKey = new Date(date).toISOString().split('T')[0];
+    const flight = await Flight.findById(req.params.id);
+
+    const dateKey = getDateKey(date);
 
     if (!flight.cancelledDates.includes(dateKey)) {
       flight.cancelledDates.push(dateKey);
@@ -140,7 +155,7 @@ const cancelFlightByDate = async (req, res) => {
 
     await flight.save();
 
-    res.json({ message: 'Flight cancelled for selected date' });
+    res.json({ success: true, message: 'Cancelled for date' });
 
   } catch (error) {
     res.status(500).json({ message: error.message });
