@@ -119,35 +119,34 @@ const resetPassword = async (req, res) => {
 // @route   PUT /api/users/profile
 // @access  Private
 const updateUserProfile = async (req, res) => {
-    try {
-        const user = await User.findById(req.user._id);
+  try {
+    const user = await User.findById(req.user._id);
 
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        // Email NOT editable
-        user.name = req.body.name || user.name;
-        user.age = req.body.age ?? user.age;
-        user.gender = req.body.gender ?? user.gender;
-
-        const updatedUser = await user.save();
-
-        res.json({
-            success: true,
-            user: {
-                _id: updatedUser._id,
-                name: updatedUser.name,
-                email: updatedUser.email,
-                age: updatedUser.age,
-                gender: updatedUser.gender,
-                role: updatedUser.role
-            }
-        });
-
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
+
+    // ✅ Update allowed fields only
+    user.name = req.body.name || user.name;
+    user.age = req.body.age || user.age;
+    user.gender = req.body.gender || user.gender;
+
+    await user.save();
+
+    res.json({
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email, 
+        role: user.role,
+        age: user.age,
+        gender: user.gender
+      }
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 module.exports = { registerUser, loginUser, getUserProfile, resetPassword, updateUserProfile };
