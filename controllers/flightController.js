@@ -43,7 +43,10 @@ const bulkCreateFlights = async (req, res) => {
 
     await Flight.insertMany(flights);
 
-    res.json({ success: true, message: `${count} flights created` });
+    res.json({
+      success: true,
+      message: `${count} flights created (use wisely to avoid duplicates)`
+    });
 
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -63,11 +66,24 @@ const getFlights = async (req, res) => {
     const flights = await Flight.find(query);
 
     const dateKey = date ? getDateKey(date) : null;
-    const selectedDay = date ? new Date(date).getDay() : null;
+    const selectedDate = date ? new Date(date) : null;
+    const selectedDay = selectedDate ? selectedDate.getDay() : null;
+
+    // ✅ NEW: 2 MONTH WINDOW
+    const today = new Date();
+    const maxDate = new Date();
+    maxDate.setMonth(today.getMonth() + 2);
 
     const result = flights
       .filter(f => {
         if (date) {
+
+          // ❌ block past
+          if (selectedDate < today) return false;
+
+          // ❌ block beyond 2 months
+          if (selectedDate > maxDate) return false;
+
           // schedule check
           if (f.scheduleType === 'weekly' && !f.daysOfWeek.includes(selectedDay)) {
             return false;
@@ -81,14 +97,22 @@ const getFlights = async (req, res) => {
         return true;
       })
       .map(f => {
-        const seats =
-          dateKey && f.seatsByDate.get(dateKey) !== undefined
-            ? f.seatsByDate.get(dateKey)
-            : f.seatsAvailable;
+
+        let seats = {};
+        let prices = {};
+
+        if (dateKey && f.seatsByDate.get(dateKey)) {
+          seats = f.seatsByDate.get(dateKey);
+        } else {
+          seats = f.seatConfig || {};
+        }
+
+        prices = f.priceConfig || {};
 
         return {
           ...f._doc,
-          seatsAvailable: seats
+          seatsAvailable: seats,
+          prices
         };
       });
 

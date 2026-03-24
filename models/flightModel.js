@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const flightSchema = new mongoose.Schema({
+
   flightNumber: {
     type: String,
     required: true,
@@ -35,21 +36,28 @@ const flightSchema = new mongoose.Schema({
     required: true
   },
 
-  price: {
-    type: Number,
-    required: true,
-    min: 0
+  // 🔥 NEW PRICE CONFIG
+  priceConfig: {
+    economy: { type: Number, required: true },
+    business: { type: Number, required: true },
+    first: { type: Number, required: true }
   },
 
-  seatsAvailable: {
-    type: Number,
-    required: true,
-    min: 1
+  // 🔥 NEW SEAT CONFIG
+  seatConfig: {
+    economy: { type: Number, required: true },
+    business: { type: Number, required: true },
+    first: { type: Number, required: true }
   },
 
+  // BACKWARD SAFE (KEEP)
+  price: Number,
+  seatsAvailable: Number,
+
+  // 🔥 DATE-WISE CLASS SEATS
   seatsByDate: {
     type: Map,
-    of: Number,
+    of: Object,
     default: {}
   },
 
@@ -61,15 +69,7 @@ const flightSchema = new mongoose.Schema({
 
   daysOfWeek: {
     type: [Number],
-    validate: {
-      validator: function (arr) {
-        if (this.scheduleType === 'weekly') {
-          return arr.length > 0;
-        }
-        return true;
-      },
-      message: 'daysOfWeek required for weekly flights'
-    }
+    default: []
   },
 
   cancelledDates: {

@@ -113,4 +113,41 @@ const resetPassword = async (req, res) => {
     }
 };
 
-module.exports = { registerUser, loginUser, getUserProfile, resetPassword };
+// ADD THIS FUNCTION
+
+// @desc    Update user profile
+// @route   PUT /api/users/profile
+// @access  Private
+const updateUserProfile = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Email NOT editable
+        user.name = req.body.name || user.name;
+        user.age = req.body.age ?? user.age;
+        user.gender = req.body.gender ?? user.gender;
+
+        const updatedUser = await user.save();
+
+        res.json({
+            success: true,
+            user: {
+                _id: updatedUser._id,
+                name: updatedUser.name,
+                email: updatedUser.email,
+                age: updatedUser.age,
+                gender: updatedUser.gender,
+                role: updatedUser.role
+            }
+        });
+
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+module.exports = { registerUser, loginUser, getUserProfile, resetPassword, updateUserProfile };

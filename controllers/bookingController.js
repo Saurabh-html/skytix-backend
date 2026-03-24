@@ -5,12 +5,14 @@ const getDateKey = (date) => {
   return new Date(date).toLocaleDateString('en-CA');
 };
 
+// ==========================
 // CREATE BOOKING
+// ==========================
 const createBooking = async (req, res) => {
   try {
-    const { flightId, passengers, date } = req.body;
+    const { flightId, passengers, date, seatClass } = req.body;
 
-    if (!flightId || !passengers || !date) {
+    if (!flightId || !passengers || !date || !seatClass) {
       return res.status(400).json({ message: 'Missing fields' });
     }
 
@@ -37,9 +39,11 @@ const createBooking = async (req, res) => {
     const dateKey = getDateKey(date);
     const selectedDay = selectedDate.getDay();
 
-    // schedule validation
-    if (flight.scheduleType === 'weekly' &&
-        !flight.daysOfWeek.includes(selectedDay)) {
+    // ✅ schedule validation
+    if (
+      flight.scheduleType === 'weekly' &&
+      !flight.daysOfWeek.includes(selectedDay)
+    ) {
       return res.status(400).json({ message: 'Flight not available on this day' });
     }
 
@@ -49,24 +53,34 @@ const createBooking = async (req, res) => {
 
     const seatsRequested = passengers.length;
 
-    const availableSeats =
-      flight.seatsByDate.get(dateKey) ?? flight.seatsAvailable;
+    // 🔥 CLASS + DATE SEATS
+    let seatsForDate =
+      flight.seatsByDate.get(dateKey) || { ...flight.seatConfig };
+
+    const availableSeats = seatsForDate[seatClass];
 
     if (availableSeats < seatsRequested) {
-      return res.status(400).json({ message: 'Not enough seats available' });
+      return res.status(400).json({
+        message: `Only ${availableSeats} ${seatClass} seats left`
+      });
     }
 
-    const totalPrice = flight.price * seatsRequested;
+    // 🔥 PRICE
+    const totalPrice = flight.priceConfig[seatClass] * seatsRequested;
 
     const booking = await Booking.create({
       user: req.user._id,
       flight: flightId,
       date,
       passengers,
+      seatClass,
       totalPrice
     });
 
-    flight.seatsByDate.set(dateKey, availableSeats - seatsRequested);
+    // 🔥 UPDATE SEATS
+    seatsForDate[seatClass] -= seatsRequested;
+
+    flight.seatsByDate.set(dateKey, seatsForDate);
     await flight.save();
 
     res.status(201).json({ success: true, booking });
@@ -76,7 +90,9 @@ const createBooking = async (req, res) => {
   }
 };
 
-// GET BOOKINGS
+// ==========================
+// GET USER BOOKINGS
+// ==========================
 const getMyBookings = async (req, res) => {
   try {
     const bookings = await Booking.find({
@@ -91,7 +107,9 @@ const getMyBookings = async (req, res) => {
   }
 };
 
+// ==========================
 // CANCEL BOOKING
+// ==========================
 const cancelBooking = async (req, res) => {
   try {
     const { passengerIndexes } = req.body;
@@ -106,6 +124,9 @@ const cancelBooking = async (req, res) => {
 
     const dateKey = getDateKey(booking.date);
 
+    let seatsForDate =
+      flight.seatsByDate.get(dateKey) || { ...flight.seatConfig };
+
     const remainingPassengers = booking.passengers.filter(
       (_, i) => !passengerIndexes.includes(i)
     );
@@ -113,17 +134,19 @@ const cancelBooking = async (req, res) => {
     const cancelledCount =
       booking.passengers.length - remainingPassengers.length;
 
-    const existingSeats =
-      flight.seatsByDate.get(dateKey) ?? flight.seatsAvailable;
+    // 🔥 RETURN SEATS (CLASS BASED)
+    seatsForDate[booking.seatClass] += cancelledCount;
 
-    flight.seatsByDate.set(dateKey, existingSeats + cancelledCount);
+    flight.seatsByDate.set(dateKey, seatsForDate);
 
     if (remainingPassengers.length === 0) {
       await booking.deleteOne();
     } else {
       booking.passengers = remainingPassengers;
       booking.totalPrice =
-        remainingPassengers.length * flight.price;
+        remainingPassengers.length *
+        flight.priceConfig[booking.seatClass];
+
       await booking.save();
     }
 
@@ -152,9 +175,8 @@ const getAllBookings = async (req, res) => {
   }
 };
 
-
 // ==========================
-// ADMIN: STATS (AGGREGATION)
+// ADMIN: STATS
 // ==========================
 const getBookingStats = async (req, res) => {
   try {
@@ -170,7 +192,6 @@ const getBookingStats = async (req, res) => {
       }
     ]);
 
-    // DAILY BOOKINGS (for charts)
     const daily = await Booking.aggregate([
       {
         $group: {
@@ -199,4 +220,10 @@ const getBookingStats = async (req, res) => {
   }
 };
 
-module.exports = { createBooking, getMyBookings, cancelBooking, getAllBookings, getBookingStats };
+module.exports = {
+  createBooking,
+  getMyBookings,
+  cancelBooking,
+  getAllBookings,
+  getBookingStats
+};
