@@ -5,15 +5,32 @@ const getDateKey = (date) => {
   return new Date(date).toLocaleDateString('en-CA');
 };
 
-// ==========================
 // CREATE BOOKING
-// ==========================
 const createBooking = async (req, res) => {
   try {
     const { flightId, passengers, date, seatClass } = req.body;
 
-    if (!flightId || !passengers || !date || !seatClass) {
-      return res.status(400).json({ message: 'Missing fields' });
+    if (!flightId || !date || !seatClass) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    // VALIDATE SEAT CLASS
+    const validClasses = ['economy', 'business', 'first'];
+    if (!validClasses.includes(seatClass)) {
+      return res.status(400).json({ message: 'Invalid seat class' });
+    }
+
+    // VALIDATE PASSENGERS
+    if (!Array.isArray(passengers) || passengers.length === 0) {
+      return res.status(400).json({ message: 'Passengers required' });
+    }
+
+    for (let p of passengers) {
+      if (!p.name || !p.age || !p.gender || !p.seat) {
+        return res.status(400).json({
+          message: 'Invalid passenger details'
+        });
+      }
     }
 
     const selectedDate = new Date(date);
@@ -39,7 +56,6 @@ const createBooking = async (req, res) => {
     const dateKey = getDateKey(date);
     const selectedDay = selectedDate.getDay();
 
-    // ✅ schedule validation
     if (
       flight.scheduleType === 'weekly' &&
       !flight.daysOfWeek.includes(selectedDay)
@@ -53,7 +69,6 @@ const createBooking = async (req, res) => {
 
     const seatsRequested = passengers.length;
 
-    // 🔥 CLASS + DATE SEATS
     let seatsForDate =
       flight.seatsByDate.get(dateKey) || { ...flight.seatConfig };
 
@@ -65,7 +80,6 @@ const createBooking = async (req, res) => {
       });
     }
 
-    // 🔥 PRICE
     const totalPrice = flight.priceConfig[seatClass] * seatsRequested;
 
     const booking = await Booking.create({
@@ -77,7 +91,6 @@ const createBooking = async (req, res) => {
       totalPrice
     });
 
-    // 🔥 UPDATE SEATS
     seatsForDate[seatClass] -= seatsRequested;
 
     flight.seatsByDate.set(dateKey, seatsForDate);
@@ -85,14 +98,15 @@ const createBooking = async (req, res) => {
 
     res.status(201).json({ success: true, booking });
 
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  } catch {
+    res.status(500).json({
+      success: false,
+      message: 'Something went wrong. Please try again.'
+    });
   }
 };
 
-// ==========================
-// GET USER BOOKINGS
-// ==========================
+// GET MY BOOKINGS
 const getMyBookings = async (req, res) => {
   try {
     const bookings = await Booking.find({
@@ -102,14 +116,15 @@ const getMyBookings = async (req, res) => {
 
     res.json({ success: true, bookings });
 
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  } catch {
+    res.status(500).json({
+      success: false,
+      message: 'Something went wrong. Please try again.'
+    });
   }
 };
 
-// ==========================
 // CANCEL BOOKING
-// ==========================
 const cancelBooking = async (req, res) => {
   try {
     const { passengerIndexes } = req.body;
@@ -134,7 +149,6 @@ const cancelBooking = async (req, res) => {
     const cancelledCount =
       booking.passengers.length - remainingPassengers.length;
 
-    // 🔥 RETURN SEATS (CLASS BASED)
     seatsForDate[booking.seatClass] += cancelledCount;
 
     flight.seatsByDate.set(dateKey, seatsForDate);
@@ -154,14 +168,15 @@ const cancelBooking = async (req, res) => {
 
     res.json({ success: true, message: 'Tickets cancelled' });
 
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  } catch {
+    res.status(500).json({
+      success: false,
+      message: 'Something went wrong. Please try again.'
+    });
   }
 };
 
-// ==========================
 // ADMIN: GET ALL BOOKINGS
-// ==========================
 const getAllBookings = async (req, res) => {
   try {
     const bookings = await Booking.find()
@@ -170,17 +185,17 @@ const getAllBookings = async (req, res) => {
 
     res.json({ success: true, bookings });
 
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  } catch {
+    res.status(500).json({
+      success: false,
+      message: 'Something went wrong. Please try again.'
+    });
   }
 };
 
-// ==========================
 // ADMIN: STATS
-// ==========================
 const getBookingStats = async (req, res) => {
   try {
-
     const stats = await Booking.aggregate([
       {
         $group: {
@@ -215,8 +230,11 @@ const getBookingStats = async (req, res) => {
       daily
     });
 
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  } catch {
+    res.status(500).json({
+      success: false,
+      message: 'Something went wrong. Please try again.'
+    });
   }
 };
 
