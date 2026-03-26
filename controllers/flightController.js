@@ -186,7 +186,7 @@ const cancelFlightByDate = async (req, res) => {
   }
 };
 
-export const updateFlight = async (req, res) => {
+const updateFlight = async (req, res) => {
   try {
     const { id } = req.params;
 
