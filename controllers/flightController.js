@@ -1,6 +1,6 @@
 const Flight = require('../models/flightModel');
 
-// 🔧 Utility (NO timezone bug)
+//  Utility (NO timezone bug)
 const getDateKey = (date) => {
   return new Date(date).toLocaleDateString('en-CA'); // YYYY-MM-DD
 };
@@ -69,7 +69,7 @@ const getFlights = async (req, res) => {
     const selectedDate = date ? new Date(date) : null;
     const selectedDay = selectedDate ? selectedDate.getDay() : null;
 
-    // ✅ NEW: 2 MONTH WINDOW
+    //  NEW: 2 MONTH WINDOW
     const today = new Date();
     const maxDate = new Date();
     maxDate.setMonth(today.getMonth() + 2);
@@ -78,10 +78,10 @@ const getFlights = async (req, res) => {
       .filter(f => {
         if (date) {
 
-          // ❌ block past
+          //  block past
           if (selectedDate < today) return false;
 
-          // ❌ block beyond 2 months
+          //  block beyond 2 months
           if (selectedDate > maxDate) return false;
 
           // schedule check
@@ -186,37 +186,30 @@ const cancelFlightByDate = async (req, res) => {
   }
 };
 
-const updateFlight = async (req, res) => {
+export const updateFlight = async (req, res) => {
   try {
-    const flight = await Flight.findById(req.params.id);
+    const { id } = req.params;
 
-    if (!flight) {
+    const updatedFlight = await Flight.findByIdAndUpdate(
+      id,
+      req.body,
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedFlight) {
       return res.status(404).json({ message: 'Flight not found' });
     }
 
-    //  Update basic fields
-    flight.flightNumber = req.body.flightNumber || flight.flightNumber;
-    flight.from = req.body.from || flight.from;
-    flight.to = req.body.to || flight.to;
-    flight.departureTime = req.body.departureTime || flight.departureTime;
-    flight.arrivalTime = req.body.arrivalTime || flight.arrivalTime;
-
-    //  Seat config
-    if (req.body.seatConfig) {
-      flight.seatConfig = req.body.seatConfig;
-    }
-
-    //  Price config
-    if (req.body.priceConfig) {
-      flight.priceConfig = req.body.priceConfig;
-    }
-
-    await flight.save();
-
-    res.json({ success: true, message: 'Flight updated' });
+    res.status(200).json({
+      message: 'Flight updated successfully',
+      flight: updatedFlight
+    });
 
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error(error);
+    res.status(500).json({
+      message: 'Error updating flight'
+    });
   }
 };
 
