@@ -16,24 +16,13 @@ const bookingSchema = new mongoose.Schema({
     required: true
   },
 
-  // 🔥 UPDATED PASSENGER STRUCTURE
   passengers: [
     {
       name: String,
       age: Number,
-      gender: String,
-      seat: String   // ✅ NEW
+      gender: String
     }
-  ],
-
-  // 🔥 NEW
-  seatClass: {
-    type: String,
-    enum: ['economy', 'business', 'first'],
-    required: true
-  },
-
-  totalPrice: Number
+  ]
 
 }, { timestamps: true });
 

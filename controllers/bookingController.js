@@ -8,15 +8,11 @@ const getDateKey = (date) => {
 // CREATE BOOKING
 const createBooking = async (req, res) => {
   try {
-    const { flightId, passengers, date, seatClass } = req.body;
+    const { flightId, passengers, date } = req.body;
 
-    if (!flightId || !date || !seatClass) {
+    // ✅ basic validation
+    if (!flightId || !date) {
       return res.status(400).json({ message: 'Missing required fields' });
-    }
-
-    const validClasses = ['economy', 'business', 'first'];
-    if (!validClasses.includes(seatClass)) {
-      return res.status(400).json({ message: 'Invalid seat class' });
     }
 
     if (!Array.isArray(passengers) || passengers.length === 0) {
@@ -24,7 +20,7 @@ const createBooking = async (req, res) => {
     }
 
     for (let p of passengers) {
-      if (!p.name || !p.age || !p.gender || !p.seat) {
+      if (!p.name || !p.age || !p.gender) {
         return res.status(400).json({
           message: 'Invalid passenger details'
         });
@@ -51,71 +47,23 @@ const createBooking = async (req, res) => {
       return res.status(404).json({ message: 'Flight not found' });
     }
 
-    const dateKey = getDateKey(date);
-    const selectedDay = selectedDate.getDay();
-
-    if (
-      flight.scheduleType === 'weekly' &&
-      !flight.daysOfWeek.includes(selectedDay)
-    ) {
-      return res.status(400).json({ message: 'Flight not available on this day' });
-    }
-
-    if (flight.cancelledDates.includes(dateKey)) {
-      return res.status(400).json({ message: 'Flight cancelled for this date' });
-    }
-
-    const seatsRequested = passengers.length;
-
-    //  SAFE seatConfig fallback
-    const baseSeats = flight.seatConfig || {
-      economy: 0,
-      business: 0,
-      first: 0
-    };
-
-    let seatsForDate =
-      flight.seatsByDate.get(dateKey) || { ...baseSeats };
-
-    const availableSeats = seatsForDate[seatClass] || 0;
-
-    if (availableSeats < seatsRequested) {
-      return res.status(400).json({
-        message: `Only ${availableSeats} ${seatClass} seats left`
-      });
-    }
-
-    // SAFE priceConfig fallback
-    const basePrices = flight.priceConfig || {
-      economy: flight.price || 0,
-      business: flight.price || 0,
-      first: flight.price || 0
-    };
-
-    const totalPrice = basePrices[seatClass] * seatsRequested;
-
     const booking = await Booking.create({
       user: req.user._id,
       flight: flightId,
       date,
-      passengers,
-      seatClass,
-      totalPrice
+      passengers
     });
 
-    //  Update seats safely
-    seatsForDate[seatClass] -= seatsRequested;
-
-    flight.seatsByDate.set(dateKey, seatsForDate);
-    await flight.save();
-
-    res.status(201).json({ success: true, booking });
+    res.status(201).json({
+      success: true,
+      booking
+    });
 
   } catch (error) {
-    console.error(error); // IMPORTANT for debugging
+    console.error(error);
     res.status(500).json({
       success: false,
-      message: 'Something went wrong. Please try again.'
+      message: 'Something went wrong'
     });
   }
 };
