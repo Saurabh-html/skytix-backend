@@ -186,11 +186,46 @@ const cancelFlightByDate = async (req, res) => {
   }
 };
 
+const updateFlight = async (req, res) => {
+  try {
+    const flight = await Flight.findById(req.params.id);
+
+    if (!flight) {
+      return res.status(404).json({ message: 'Flight not found' });
+    }
+
+    //  Update basic fields
+    flight.flightNumber = req.body.flightNumber || flight.flightNumber;
+    flight.from = req.body.from || flight.from;
+    flight.to = req.body.to || flight.to;
+    flight.departureTime = req.body.departureTime || flight.departureTime;
+    flight.arrivalTime = req.body.arrivalTime || flight.arrivalTime;
+
+    //  Seat config
+    if (req.body.seatConfig) {
+      flight.seatConfig = req.body.seatConfig;
+    }
+
+    //  Price config
+    if (req.body.priceConfig) {
+      flight.priceConfig = req.body.priceConfig;
+    }
+
+    await flight.save();
+
+    res.json({ success: true, message: 'Flight updated' });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createFlight,
   getFlights,
   cancelFlight,
   bulkCreateFlights,
   cancelFlightByDate,
-  deleteFlight
+  deleteFlight,
+  updateFlight
 };

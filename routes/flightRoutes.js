@@ -7,7 +7,8 @@ const {
   cancelFlight,
   bulkCreateFlights,
   cancelFlightByDate,
-  deleteFlight
+  deleteFlight,
+  updateFlight
 } = require('../controllers/flightController');
 
 const { protect, admin } = require('../middleware/authMiddleware');
@@ -23,5 +24,7 @@ router.put('/:id/cancel-date', protect, admin, cancelFlightByDate);
 router.put('/:id/cancel', protect, admin, cancelFlight);
 
 router.delete('/:id', protect, admin, deleteFlight);
+
+router.put('/:id', updateFlight);
 
 module.exports = router;

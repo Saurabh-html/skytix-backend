@@ -14,13 +14,11 @@ const createBooking = async (req, res) => {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
-    // VALIDATE SEAT CLASS
     const validClasses = ['economy', 'business', 'first'];
     if (!validClasses.includes(seatClass)) {
       return res.status(400).json({ message: 'Invalid seat class' });
     }
 
-    // VALIDATE PASSENGERS
     if (!Array.isArray(passengers) || passengers.length === 0) {
       return res.status(400).json({ message: 'Passengers required' });
     }
@@ -69,10 +67,17 @@ const createBooking = async (req, res) => {
 
     const seatsRequested = passengers.length;
 
-    let seatsForDate =
-      flight.seatsByDate.get(dateKey) || { ...flight.seatConfig };
+    //  SAFE seatConfig fallback
+    const baseSeats = flight.seatConfig || {
+      economy: 0,
+      business: 0,
+      first: 0
+    };
 
-    const availableSeats = seatsForDate[seatClass];
+    let seatsForDate =
+      flight.seatsByDate.get(dateKey) || { ...baseSeats };
+
+    const availableSeats = seatsForDate[seatClass] || 0;
 
     if (availableSeats < seatsRequested) {
       return res.status(400).json({
@@ -80,7 +85,14 @@ const createBooking = async (req, res) => {
       });
     }
 
-    const totalPrice = flight.priceConfig[seatClass] * seatsRequested;
+    // SAFE priceConfig fallback
+    const basePrices = flight.priceConfig || {
+      economy: flight.price || 0,
+      business: flight.price || 0,
+      first: flight.price || 0
+    };
+
+    const totalPrice = basePrices[seatClass] * seatsRequested;
 
     const booking = await Booking.create({
       user: req.user._id,
@@ -91,6 +103,7 @@ const createBooking = async (req, res) => {
       totalPrice
     });
 
+    //  Update seats safely
     seatsForDate[seatClass] -= seatsRequested;
 
     flight.seatsByDate.set(dateKey, seatsForDate);
@@ -98,7 +111,8 @@ const createBooking = async (req, res) => {
 
     res.status(201).json({ success: true, booking });
 
-  } catch {
+  } catch (error) {
+    console.error(error); // IMPORTANT for debugging
     res.status(500).json({
       success: false,
       message: 'Something went wrong. Please try again.'
