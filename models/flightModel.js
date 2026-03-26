@@ -36,35 +36,10 @@ const flightSchema = new mongoose.Schema({
     required: true
   },
 
-  // 🔥 NEW PRICE CONFIG
-  priceConfig: {
-    economy: { type: Number, required: true },
-    business: { type: Number, required: true },
-    first: { type: Number, required: true }
-  },
-
-  // 🔥 NEW SEAT CONFIG
-  seatConfig: {
-    economy: { type: Number, required: true },
-    business: { type: Number, required: true },
-    first: { type: Number, required: true }
-  },
-
-  // BACKWARD SAFE (KEEP)
-  price: Number,
-  seatsAvailable: Number,
-
-  // 🔥 DATE-WISE CLASS SEATS
-  seatsByDate: {
-    type: Map,
-    of: Object,
-    default: {}
-  },
-
   scheduleType: {
     type: String,
     enum: ['daily', 'weekly'],
-    required: true
+    default: 'daily'
   },
 
   daysOfWeek: {
